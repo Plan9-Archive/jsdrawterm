@@ -7,7 +7,7 @@ var drawmsg = {
 	y: {fmt: ["i4:id", "b16:r", "R:buf"], handler: drawload},
 };
 
-var disp = {id: 0, r: [0, 0, 500, 500], chan: "r8g8b8a8", repl: 0, refresh: 0};
+var disp = {id: 0, r: [0, 0, 640, 480], chan: "r8g8b8a8", repl: 0, refresh: 0};
 disp.clipr = disp.r;
 var pub = {"noborder.screen.0": disp};
 var screens = {};
