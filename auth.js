@@ -149,7 +149,7 @@ function pack(data, fmt) {
 
 function startauth() {
 	cpubuf = "";
-	conn = newWebSocket("ws://phicode.de:8080/ncpu");
+	conn = newWebSocket("ws://plan9.echoline.org:8080/ncpu");
 	conn.onmessage = function(evt) {
 		cpubuf += window.atob(evt.data);
 		if(oncpumsg)
@@ -220,7 +220,7 @@ function startauth() {
 				s.uid = "foo";
 				chal = s.chal;
 				s = pack(s, TicketReq);
-				authconn = newWebSocket("ws://phicode.de:8080/auth");
+				authconn = newWebSocket("ws://plan9.echoline.org:8080/auth");
 				authconn.onmessage = function(evt) {
 					var buf, sticket;
 

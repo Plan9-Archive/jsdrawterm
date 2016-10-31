@@ -1,17 +1,18 @@
 package main
 
 import (
-	"code.google.com/p/go.net/websocket"
+	"golang.org/x/net/websocket"
 	"encoding/base64"
 	"flag"
 	"io"
 	"log"
 	"net"
+	"fmt"
 	"net/http"
 )
 
-var authsrv = flag.String("a", "localhost:567", "auth server to proxy to")
-var ncpusrv = flag.String("c", "localhost:567", "auth server to proxy to")
+var authsrv = flag.String("a", "plan9.echoline.org:567", "auth server to proxy to")
+var ncpusrv = flag.String("c", "plan9.echoline.org:17010", "ncpu server to proxy to")
 
 var listen = flag.String("l", ":8080", "websocket server bind address")
 
@@ -30,10 +31,13 @@ func wsHandler(ws *websocket.Conn, addr string) {
 	var ebuf [4096]byte
 
 	defer ws.Close()
+	fmt.Print("Dialing ", addr, "... ")
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
+		fmt.Println("error.")
 		return
 	}
+	fmt.Println("success.")
 	defer conn.Close()
 	go func() {
 		io.Copy(conn, base64.NewDecoder(base64.StdEncoding, ws))
