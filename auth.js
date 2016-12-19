@@ -147,7 +147,11 @@ function pack(data, fmt) {
 	return r;
 }
 
+var password;
+
 function startauth() {
+	password = prompt("password", "");
+
 	cpubuf = "";
 	conn = newWebSocket("ws://plan9.echoline.org:8080/ncpu");
 	conn.onmessage = function(evt) {
@@ -216,8 +220,8 @@ function startauth() {
 				state++;
 				s = unpack(s, TicketReq);
 				s.type = 1;
-				s.hostid = "foo";
-				s.uid = "foo";
+				s.hostid = "eli";
+				s.uid = "eli";
 				chal = s.chal;
 				s = pack(s, TicketReq);
 				authconn = newWebSocket("ws://plan9.echoline.org:8080/auth");
@@ -230,7 +234,7 @@ function startauth() {
 						fatal("AS ticket too short");
 					if(buf.charCodeAt(0) != 4)
 						fatal("AS protocol botch " + buf.charCodeAt(0));
-					cticket = unpack(decrypt(passtokey("password"), buf.substr(1, 72)), Ticket);
+					cticket = unpack(decrypt(passtokey(password), buf.substr(1, 72)), Ticket);
 					if(cticket.num != 65)
 						fatal("wrong password");
 					sticket = buf.substr(73, 72);
