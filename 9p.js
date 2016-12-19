@@ -143,7 +143,7 @@ function Topen(p) {
 		fids[p.fid].bloc = 0;
 		fids[p.fid].nloc = 0;
 		fids[p.fid].open = true;
-		return send9p({type: msgtype.Ropen, tag: p.tag, qid: pack(f.qid, Qid), iounit: 0})
+		return send9p({type: msgtype.Ropen, tag: p.tag, qid: pack(f.qid, Qid), iounit: 0x10000})
 	}
 	switch(p.mode & 3){
 	case 2:
@@ -161,7 +161,7 @@ function Topen(p) {
 		return error9p(p.tag, "permission denied");
 	}
 	fids[p.fid].open = true;
-	send9p({type: msgtype.Ropen, tag: p.tag, qid: pack(f.qid, Qid), iounit: 0})
+	send9p({type: msgtype.Ropen, tag: p.tag, qid: pack(f.qid, Qid), iounit: 0x10000})
 }
 
 function Tcreate(p) {
