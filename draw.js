@@ -65,7 +65,6 @@ function drawnewopen(f) {
 			return "no canvas";
 		disp.canvas = canv.canvas;
 		disp.ctx = canv;
-	//	disp.data = canv.getImageData(0, 0, canv.canvas.width, canv.canvas.height);
 	}
 	f.f = lookupfile("/dev/draw/" + newconn().id + "/ctl", true);
 	return "";
@@ -87,16 +86,17 @@ function drawctlread(f, p) {
 }
 
 function drawdatawrite(f, p) {
-	var t, s, m, index = 0, end = p.data.length;
+	var t, s, m, i;
 
-	while(index < end){
-		t = p.data[index];
+	i = 0;
+	while(i < p.data.length){
+		t = p.data[i];
 		if(drawmsg[t] == undefined){
 			writeterminal("unknown message " + t + "\n");
 			return error9p(p.tag, "unknown message " + t);
 		}
-		index++;
-		m = unpack(p.data.substring(index), drawmsg[t].fmt);
+		i++;
+		m = unpack(p.data.substring(i), drawmsg[t].fmt);
 		if(drawdebugon){
 			print(t + " " + JSON.stringify(m) + "\n");
 		}
@@ -106,13 +106,13 @@ function drawdatawrite(f, p) {
 			return error9p(p.tag, s);
 		}
 
-		index += drawmsg[t].size;
+		i += drawmsg[t].size;
 		switch(t){
 		case 'n':
-			index += m.n.length;
+			i += m.n.length;
 			break;
 		case 'y':
-			index += m.buf.length;
+			i += m.buf.length;
 			break;
 		default:
 			break;
@@ -157,25 +157,24 @@ function drawclip(c, p) {
 }
 
 function ellipse(c, p, fill) {
-	var dst, src, center;
+	var dst, src, center, color;
 
 	dst = c.imgs[p.dstid];
 	if(dst == undefined) return "id " + p.dstid + " not in use";
 	src = c.imgs[p.srcid];
 	if(src == undefined) return "id " + p.srcid + " not in use";
-	center = punpack(p.c);
 
-	var color = src.ctx.getImageData(0, 0, 1, 1).data;
+	center = punpack(p.c);
+	color = src.ctx.getImageData(0, 0, 1, 1).data;
 
 	dst.ctx.beginPath();
-	dst.ctx.ellipse(center[0], center[1], p.a * 2, p.b * 2, 0, 0, 2 * Math.PI);
+	dst.ctx.ellipse(center[0], center[1], p.a, p.b, 0, 0, 2 * Math.PI);
 	if(fill){
 		dst.ctx.fillStyle = 'rgb(' + color[0] + ',' + color[1] + ',' + color[2] + ')';
 		dst.ctx.fill();
-	}else{
-		dst.ctx.strokeStyle = 'rgb(' + color[0] + ',' + color[1] + ',' + color[2] + ')';
-		dst.ctx.stroke();
 	}
+	dst.ctx.strokeStyle = 'rgb(' + color[0] + ',' + color[1] + ',' + color[2] + ')';
+	dst.ctx.stroke();
 
 	dstflush(dst);
 }
@@ -185,7 +184,7 @@ function drawfillellipse(c, p) {
 }
 
 function drawline(c, p) {
-	var dst, src, p0, p1;
+	var dst, src, p0, p1, color;
 
 	dst = c.imgs[p.dstid];
 	if(dst == undefined) return "id " + p.dstid + " not in use";
@@ -194,8 +193,7 @@ function drawline(c, p) {
 
 	p0 = punpack(p.p0);
 	p1 = punpack(p.p1);
-
-	var color = src.ctx.getImageData(0, 0, 1, 1).data;
+	color = src.ctx.getImageData(0, 0, 1, 1).data;
 
 	dst.ctx.beginPath();
 	dst.ctx.moveTo(p0[0], p0[1]);
@@ -247,7 +245,6 @@ function dstflush(dst) {
 			memdraw(s.image, s.image.r, s.win[x], [0, 0], undefined, undefined, 11);
 		dstflush(s.image);
 	}
-//	dst.ctx.putImageData(dst.data, 0, 0);
 }
 
 function drawdraw(c, p) {
