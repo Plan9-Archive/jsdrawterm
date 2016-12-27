@@ -1,8 +1,12 @@
 var drawmsg = {
 	A: {fmt: ["i4:id", "i4:imageid", "i4:fillid", "i1:public"], handler: drawallocscreen, size: 13},
 	b: {fmt: ["i4:id", "i4:screenid", "i1:refresh", "b4:chan", "i1:repl", "b16:r", "b16:clipr", "b4:color"], handler: drawallocate, size: 50},
+	c: {fmt: ["i4:dstid", "i1:repl", "b16:clipr"], handler: drawclip, size:21},
 	d: {fmt: ["i4:dstid", "i4:srcid", "i4:maskid", "b16:dstr", "b8:srcp", "b8:maskp"], handler: drawdraw, size: 44},
+	D: {fmt: ["i1:debug"], handler: drawdebug, size: 1},
+	E: {fmt: ["i4:dstid", "i4:srcid", "b8:c", "i4:a", "i4:b", "i4:thick", "b8:sp", "i4:alpha", "i4:phi"], handler: drawfillellipse, size: 44},
 	f: {fmt: ["i4:id"], handler: drawfree, size: 4},
+	L: {fmt: ["i4:dstid", "b8:p0", "b8:p1", "i4:end0", "i4:end1", "i4:thick", "i4:srcid", "b8:sp"], handler: drawline, size: 44},
 	n: {fmt: ["i4:id", "S1:n"], handler: drawname, size: 5},
 	v: {fmt: [], handler: drawflush, size: 0},
 	y: {fmt: ["i4:id", "b16:r", "R:buf"], handler: drawload, size: 20},
@@ -17,6 +21,7 @@ var mouse = [0, 0, 0, 0];
 var canv;
 var starttime = new Date().getTime();
 var onmouse = [];
+var drawdebugon = 0;
 
 function punpack(b) {
 	var a;
@@ -58,7 +63,9 @@ function drawnewopen(f) {
 		canv = document.getElementById('draw').getContext('2d');
 		if(canv == undefined)
 			return "no canvas";
-		disp.data = canv.getImageData(0, 0, canv.canvas.width, canv.canvas.height);
+		disp.canvas = canv.canvas;
+		disp.ctx = canv;
+	//	disp.data = canv.getImageData(0, 0, canv.canvas.width, canv.canvas.height);
 	}
 	f.f = lookupfile("/dev/draw/" + newconn().id + "/ctl", true);
 	return "";
@@ -90,7 +97,9 @@ function drawdatawrite(f, p) {
 		}
 		index++;
 		m = unpack(p.data.substring(index), drawmsg[t].fmt);
-//		print(t + " " + JSON.stringify(m) + "\n");
+		if(drawdebugon){
+			print(t + " " + JSON.stringify(m) + "\n");
+		}
 		s = drawmsg[t].handler(conns[f.f.parent.id], m);
 		if(s != "" && s != undefined){
 			writeterminal(s + "\n");
@@ -117,19 +126,15 @@ function drawallocate(c, p) {
 	var i, j, n;
 
 	if(c.imgs[p.id] != undefined) return "id " + p.id + " already in use";
-	i = {id: p.id, refresh: p.refresh, r: runpack(p.r), clipr: runpack(p.clipr), chan: p.chan};
+	i = allocimg(runpack(p.r), [p.color.charCodeAt(3), p.color.charCodeAt(2), p.color.charCodeAt(1), p.color.charCodeAt(0)], p.repl);
+	i.id = p.id;
+	i.refresh = p.refresh;
+	i.clipr = runpack(p.clipr);
+	i.chan = p.chan;
 	if(p.screenid != 0){
 		i.screen = screens[p.screenid];
 		if(i.screen == undefined) return "screenid " + p.screenid + " not in use";
 		i.screen.win.push(i);
-	}
-	i.data = canv.createImageData(rw(i.r), rh(i.r));
-	n = rw(i.r) * rh(i.r);
-	for(j = 0; j < n; j++){
-		i.data.data[4 * j] = p.color.charCodeAt(3);
-		i.data.data[4 * j + 1] = p.color.charCodeAt(2);
-		i.data.data[4 * j + 2] = p.color.charCodeAt(1);
-		i.data.data[4 * j + 3] = p.color.charCodeAt(0);
 	}
 	c.imgs[p.id] = i;
 }
@@ -145,18 +150,77 @@ function drawfree(c, p) {
 	c.imgs[p.id] = undefined;
 }
 
+function drawclip(c, p) {
+	if(c.imgs[p.dstid] == undefined) return "id " + p.dstid + " not in use";
+	c.imgs[p.dstid].clipr = runpack(p.clipr);
+	c.imgs[p.dstid].repl = p.repl;
+}
+
+function ellipse(c, p, fill) {
+	var dst, src, center;
+
+	dst = c.imgs[p.dstid];
+	if(dst == undefined) return "id " + p.dstid + " not in use";
+	src = c.imgs[p.srcid];
+	if(src == undefined) return "id " + p.srcid + " not in use";
+	center = punpack(p.c);
+
+	var color = src.ctx.getImageData(0, 0, 1, 1).data;
+
+	dst.ctx.beginPath();
+	dst.ctx.ellipse(center[0], center[1], p.a * 2, p.b * 2, 0, 0, 2 * Math.PI);
+	if(fill){
+		dst.ctx.fillStyle = 'rgb(' + color[0] + ',' + color[1] + ',' + color[2] + ')';
+		dst.ctx.fill();
+	}else{
+		dst.ctx.strokeStyle = 'rgb(' + color[0] + ',' + color[1] + ',' + color[2] + ')';
+		dst.ctx.stroke();
+	}
+
+	dstflush(dst);
+}
+
+function drawfillellipse(c, p) {
+	ellipse(c, p, 1);
+}
+
+function drawline(c, p) {
+	var dst, src, p0, p1;
+
+	dst = c.imgs[p.dstid];
+	if(dst == undefined) return "id " + p.dstid + " not in use";
+	src = c.imgs[p.srcid];
+	if(src == undefined) return "id " + p.srcid + " not in use";
+
+	p0 = punpack(p.p0);
+	p1 = punpack(p.p1);
+
+	var color = src.ctx.getImageData(0, 0, 1, 1).data;
+
+	dst.ctx.beginPath();
+	dst.ctx.moveTo(p0[0], p0[1]);
+	dst.ctx.lineTo(p1[0], p1[1]);
+	dst.ctx.lineWidth = 1 + 2 * p.thick;
+	dst.ctx.strokeStyle = 'rgb(' + color[0] + ',' + color[1] + ',' + color[2] + ')';
+	dst.ctx.stroke();
+
+	dstflush(dst);
+}
+
 function drawload(c, p) {
 	var im, d, i, j, k, l, r;
 
-	i = c.imgs[p.id];
-	if(i == undefined) return "id + " + p.id + " not in use";
+	im = c.imgs[p.id];
+	if(im == undefined) return "id + " + p.id + " not in use";
 	r = runpack(p.r);
-	d = i.data.data;
+	d = im.ctx.getImageData(0, 0, im.canvas.width, im.canvas.height);
 	k = 0;
 	for(i = r[1]; i < r[3]; i++)
 		for(j = r[0]; j < r[2]; j++)
 			for(l = 0; l < 3; l++)
-				d[4 * (d.width * i + j) + l] = p.buf[k++];
+				d.data[4 * (d.data.width * i + j) + l] = p.buf[k++];
+
+	im.ctx.putImageData(d, 0, 0);
 }
 
 function drawname(c, p) {
@@ -165,7 +229,12 @@ function drawname(c, p) {
 	c.imgs[p.id] = pub[p.n];
 }
 
+function drawdebug(c, p) {
+	drawdebugon = p.debug;
+}
+
 function drawflush(c, p) {
+	dstflush(disp);
 }
 
 function dstflush(dst) {
@@ -178,8 +247,7 @@ function dstflush(dst) {
 			memdraw(s.image, s.image.r, s.win[x], [0, 0], undefined, undefined, 11);
 		dstflush(s.image);
 	}
-	if(dst == disp)
-		canv.putImageData(dst.data, 0, 0);
+//	dst.ctx.putImageData(dst.data, 0, 0);
 }
 
 function drawdraw(c, p) {
