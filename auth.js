@@ -150,6 +150,7 @@ function pack(data, fmt) {
 var password;
 
 function startauth() {
+	username = prompt("username", "");
 	password = prompt("password", "");
 
 	cpubuf = "";
@@ -220,8 +221,8 @@ function startauth() {
 				state++;
 				s = unpack(s, TicketReq);
 				s.type = 1;
-				s.hostid = "eli";
-				s.uid = "eli";
+				s.hostid = username;
+				s.uid = username;
 				chal = s.chal;
 				s = pack(s, TicketReq);
 				authconn = newWebSocket("ws://plan9.echoline.org:8080/auth");

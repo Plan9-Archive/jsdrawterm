@@ -24,21 +24,31 @@ function offset(r, p) {
 
 function allocimg(rect, fill, repl) {
 	i = {r: rect, clipr: [0,0,65535,65535], repl: repl};
-	i.data = canv.createImageData(rw(i.r), rh(i.r));
-	n = rw(i.r) * rh(i.r);
-	for(j = 0; j < n; j++){
-		i.data.data[4 * j] = fill[0];
-		i.data.data[4 * j + 1] = fill[1];
-		i.data.data[4 * j + 2] = fill[2];
-		i.data.data[4 * j + 3] = fill[3];
-	}
+	i.canvas = document.createElement("canvas");
+	i.canvas.width = rw(i.r);
+	i.canvas.height = rh(i.r);
+	i.ctx = i.canvas.getContext("2d");
+	i.ctx.beginPath();
+	i.ctx.rect(0, 0, rw(i.r), rh(i.r));
+	i.ctx.fillStyle = "rgb(" + fill[0] + "," + fill[1] + "," + fill[2] + ")";
+	i.ctx.fill();
+//	i.data = i.ctx.getImageData(0, 0, i.canvas.width, i.canvas.height);
 	return i;
 }
 
-function memdraw(dst, r, src, sp, mask, mp, op) {
-	var spr, dx, dy, sx, sy, d, s, doff, soff;
+function alphablend(d, s, m) {
+	var ms;
 
-	mask = undefined;
+	ms = m / 255.0;
+
+	return Math.round((s * ms + d * (1.0 - ms)));
+}
+
+defmask = allocimg([0,0,1,1], [255,255,255,255], 1);
+
+function memdraw(dst, r, src, sp, mask, mp, op) {
+	var spr, dx, dy, sx, sy, mx, my, d, s, m, doff, soff, moff;
+
 	spr = [sp[0] + r[0], sp[1] + r[1]];
 	r = intersect(r, dst.r);
 	r = intersect(r, offset(src.clipr, spr));
@@ -49,24 +59,36 @@ function memdraw(dst, r, src, sp, mask, mp, op) {
 		r = intersect(r, offset(mask.clipr, mp));
 		if(mask.repl == 0)
 			r = intersect(r, offset(mask.r, mp));
+	}else{
+		// TODO this is gonna be slow...
+		mask = defmask;
+		mp = [0,0];
 	}
 
-	d = dst.data.data;
-	s = src.data.data;
-	for(dy = r[1], sy = sp[1]; dy < r[3]; dy++, sy++){
-		if(sy == src.data.height)
-			sy -= src.data.height;
-		for(dx = r[0], sx = sp[0]; dx < r[2]; dx++, sx++){
-			if(sx == src.data.width)
-				sx -= src.data.width;
-			doff = (dy * dst.data.width + dx) * 4;
-			soff = (sy * src.data.width + sx) * 4;
-			d[doff++] = s[soff++];
-			d[doff++] = s[soff++];
-			d[doff++] = s[soff++];
-			d[doff++] = s[soff++];
+	d = dst.ctx.getImageData(0, 0, dst.canvas.width, dst.canvas.height);
+	s = src.ctx.getImageData(0, 0, src.canvas.width, src.canvas.height);
+	m = mask.ctx.getImageData(0, 0, mask.canvas.width, mask.canvas.height);
+	for(dy = r[1], sy = sp[1], my = mp[1]; dy < r[3]; dy++, sy++, my++){
+		if(sy == src.canvas.height)
+			sy -= src.canvas.height;
+		if(my == mask.canvas.height)
+			my -= mask.canvas.height;
+		for(dx = r[0], sx = sp[0], mx = mp[0]; dx < r[2]; dx++, sx++, mx++){
+			if(sx == src.canvas.width)
+				sx -= src.canvas.width;
+			if(mx == mask.canvas.width)
+				mx -= mask.canvas.width;
+			doff = (dy * dst.canvas.width + dx) * 4;
+			soff = (sy * src.canvas.width + sx) * 4;
+			moff = (my * mask.canvas.width + mx) * 4;
+			d.data[doff++] = alphablend(d.data[doff], s.data[soff++], m.data[moff++]);
+			d.data[doff++] = alphablend(d.data[doff], s.data[soff++], m.data[moff++]);
+			d.data[doff++] = alphablend(d.data[doff], s.data[soff++], m.data[moff++]);
+			d.data[doff] = 0xFF; // d[doff] = s[soff]; ??? TODO
 		}
 	}
+
+	dst.ctx.putImageData(d, 0, 0);
 }
 
 function testdraw() {

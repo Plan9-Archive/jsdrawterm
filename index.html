@@ -18,6 +18,10 @@
 		lol no html5
 		</canvas>
 
-		<script>onerror = writeterminal; startauth();</script>
+		<script>
+			onerror = writeterminal;
+			window.onunload = function() { note("hangup"); };
+			startauth();
+		</script>
 	</body>
 </html>
